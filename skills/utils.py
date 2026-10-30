@@ -1,4 +1,6 @@
+import re
 from datetime import datetime
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
@@ -8,6 +10,8 @@ from skills.config import HTTP_TIMEOUT, random_headers
 
 FRANKFURTER_URL = "https://api.frankfurter.dev/v1/latest"
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
+WIKIPEDIA_SEARCH_URL = "https://en.wikipedia.org/w/api.php"
+WIKIPEDIA_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary"
 
 
 async def fetch_url(url: str, max_chars: int = 5000) -> str:
@@ -74,8 +78,33 @@ async def get_crypto_price(coin_id: str, vs_currency: str = "usd") -> str:
     return f"{coin_id}: {price} {vs_currency.upper()}"
 
 
+async def wikipedia_lookup(query: str, sentences: int = 3) -> str:
+    """Look up a topic on Wikipedia and return a short summary with the article URL."""
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        search_resp = await client.get(
+            WIKIPEDIA_SEARCH_URL,
+            params={"action": "query", "list": "search", "srsearch": query, "format": "json", "srlimit": 1},
+            headers=random_headers(),
+        )
+        search_resp.raise_for_status()
+        results = search_resp.json().get("query", {}).get("search", [])
+        if not results:
+            return f"No Wikipedia article found for: {query}"
+        title = results[0]["title"]
+
+        summary_resp = await client.get(f"{WIKIPEDIA_SUMMARY_URL}/{quote(title)}", headers=random_headers())
+        summary_resp.raise_for_status()
+        data = summary_resp.json()
+
+    extract = data.get("extract", "")
+    summary = " ".join(re.split(r"(?<=[.!?])\s+", extract)[:sentences])
+    url = data.get("content_urls", {}).get("desktop", {}).get("page", "")
+    return f"{data.get('title', title)}\n{summary}\n{url}"
+
+
 def register(mcp):
     mcp.tool()(fetch_url)
     mcp.tool()(get_time)
     mcp.tool()(convert_currency)
     mcp.tool()(get_crypto_price)
+    mcp.tool()(wikipedia_lookup)

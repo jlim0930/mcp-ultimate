@@ -31,7 +31,7 @@ The container runs as a non-root user with no host filesystem mounts --
 `sandbox`'s shell/file tools are contained to the image and a single named
 Docker volume (`mcp_workspace`), not your host disk.
 
-## Skill catalog (40 tools)
+## Skill catalog (49 tools)
 
 Any skill can be turned off without touching code -- see
 [Enable/disable skills](#enabledisable-skills).
@@ -201,10 +201,25 @@ Zero new dependencies -- `sqlite3` is Python stdlib. Multiple named databases
 supported via the `database` param (default `"default"`), sanitized against
 path traversal.
 
+### Content & knowledge
+| Tool | What it does |
+|---|---|
+| `read_pdf(source, max_chars)` | Extract text from a PDF -- `source` can be a URL or a path in `/workspace`. Pure-Python (`pypdf`), fully offline once the bytes are in hand. |
+| `get_youtube_transcript(video, max_chars)` | Get a YouTube video's transcript. Accepts a full URL or a bare video ID. |
+| `wikipedia_lookup(query, sentences)` | Short authoritative summary + article URL via Wikipedia's official API. |
+| `kb_index(url, name)` / `kb_search(query, name, max_results)` | Fetch a page (via `fetch_url`) and index it into a local SQLite FTS5 knowledge base; search it later (BM25-ranked) instead of re-fetching or re-pasting the same large page repeatedly. Zero new dependencies (`sqlite3` is stdlib). Multiple terms in a search are ANDed with no stemming -- "coroutine" won't match "coroutines"; prefer a few simple terms. |
+
 ### Memory
 | Tool | What it does |
 |---|---|
 | `remember(key, value)` / `recall(key)` / `list_memories()` / `forget(key)` | Simple JSON-backed key/value notes, persisted in the same `/workspace` volume, survives container restarts. |
+
+### Toolbox
+| Tool | What it does |
+|---|---|
+| `convert_units(value, from_unit, to_unit)` | Length (m/ft/km/mi/cm/in), weight (kg/lb/g/oz), temperature (c/f/k). Pure arithmetic, offline. |
+| `zip_files(paths, output_path)` / `unzip_file(zip_path, output_dir)` | Archive/extract files in `/workspace`. stdlib `zipfile`. |
+| `generate_qr_code(data, output_path)` | QR code as SVG, saved in `/workspace`. Fully offline -- no network call, and no Pillow dependency needed (SVG render mode). |
 
 ### Local LLM bridge
 | Tool | What it does |
@@ -329,7 +344,7 @@ Or, for Streamable HTTP instead:
 
 `lifecycle: "eager"` connects on startup; use `"lazy"` if you'd rather start
 it on demand with `/mcp:start`. Restart Pi (or reload its MCP config) and its
-40 tools should appear alongside your built-in `read`/`write`/`edit`/`bash`.
+49 tools should appear alongside your built-in `read`/`write`/`edit`/`bash`.
 
 ### Hermes Agent
 
@@ -374,7 +389,7 @@ hermes mcp test mcp_ultimate
 ```
 
 Hermes' docs recommend `tools.include: [...]` to whitelist a minimal tool
-set rather than exposing all 40 by default, especially since `run_command`
+set rather than exposing all 49 by default, especially since `run_command`
 has unrestricted shell access inside the container -- worth doing here if
 Hermes will be driving this server autonomously. You can also cut the
 exposed surface at the source with this server's own

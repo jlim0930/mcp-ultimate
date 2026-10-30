@@ -31,3 +31,10 @@ fast-hotels
 # browser build that matches whatever version of this package just got
 # installed), so leaving this unpinned is safe -- the two can't drift apart.
 playwright
+
+# Content extraction: PDF text (pure Python, offline), YouTube transcripts
+# (scrapes YouTube's caption data, no key), QR codes (SVG mode -- no Pillow
+# dependency needed).
+pypdf
+youtube-transcript-api
+qrcode
