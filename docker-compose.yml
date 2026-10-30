@@ -1,0 +1,119 @@
+services:
+  mcp-ultimate:
+    build: .
+    image: mcp-ultimate:latest
+    container_name: mcp-ultimate
+    ports:
+      - "8088:8088"
+    environment:
+      # ============================================================
+      # COMMONLY CONFIGURED -- review these for your deployment.
+      # Set actual values in .env (copy env.example), not here.
+      # ============================================================
+
+      # Your SearXNG instance. Must be reachable from inside the container --
+      # a LAN IP (not "localhost") works regardless of which machine runs this.
+      - SEARXNG_URL=${SEARXNG_URL:-http://192.168.1.20:8080}
+
+      # Local LLM bridge (ask_local_llm) -- LM Studio / MLX servers started via
+      # lmstudio_server.sh / mlx_server.sh. host.docker.internal only works if
+      # those run on the SAME machine as this container. If they run
+      # elsewhere (e.g. your Mac, while this container runs on a separate LAN
+      # box), use that machine's actual LAN IP instead -- see README.
+      - LMSTUDIO_URL=${LMSTUDIO_URL:-http://host.docker.internal:1234/v1}
+      - MLX_URL=${MLX_URL:-http://host.docker.internal:8080/v1}
+      # Only set these if you've configured an API key requirement on that
+      # server (uncommon for local-only use).
+      - LMSTUDIO_API_KEY=${LMSTUDIO_API_KEY:-}
+      - MLX_API_KEY=${MLX_API_KEY:-}
+
+      # Identity attached to commits made by git_commit. Change to your own
+      # name/email if you want commits attributable to you instead of the
+      # generic default -- git reads these env vars directly, no `git
+      # config` needed.
+      - GIT_AUTHOR_NAME=${GIT_AUTHOR_NAME:-mcp-ultimate}
+      - GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL:-mcp-ultimate@localhost}
+      - GIT_COMMITTER_NAME=${GIT_COMMITTER_NAME:-mcp-ultimate}
+      - GIT_COMMITTER_EMAIL=${GIT_COMMITTER_EMAIL:-mcp-ultimate@localhost}
+
+      # Port this server listens on inside the container. Change the
+      # "8088:8088" mapping above to match if you change this.
+      - MCP_PORT=${MCP_PORT:-8088}
+
+      # ============================================================
+      # ADVANCED -- sensible defaults, change only if you have a reason.
+      # Not in env.example; add a line there if you want to override one.
+      # ============================================================
+
+      # web_search/search_news try Bing (scraped) before SearXNG by default.
+      # "false" reverses that: SearXNG first (faster, self-hosted), Bing as
+      # the fallback instead.
+      - SEARCH_PREFER_BROWSER=${SEARCH_PREFER_BROWSER:-true}
+
+      # run_command timeout (s), and the output-truncation limit shared by
+      # sandbox/git_*/coding tools.
+      - SANDBOX_CMD_TIMEOUT=${SANDBOX_CMD_TIMEOUT:-60}
+      - SANDBOX_MAX_OUTPUT=${SANDBOX_MAX_OUTPUT:-20000}
+
+      # Outbound HTTP timeout (s) for weather/news/web_search/currency/
+      # crypto/fetch_url.
+      - HTTP_TIMEOUT=${HTTP_TIMEOUT:-10}
+
+      # Leave all three blank -- auto-detect is more correct than a fixed
+      # value here, since LM Studio/MLX/Pi's alias layer all use different,
+      # mutually incompatible model-id formats. See README if you need to
+      # pin one anyway (e.g. LM Studio has multiple models loaded at once).
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-}
+      - LMSTUDIO_MODEL=${LMSTUDIO_MODEL:-}
+      - MLX_MODEL=${MLX_MODEL:-}
+      - LOCAL_LLM_TIMEOUT=${LOCAL_LLM_TIMEOUT:-60}
+
+      # Leave blank to randomize across a pool of real desktop browser UAs
+      # per request; set one exact string to pin it instead.
+      - BROWSER_USER_AGENT=${BROWSER_USER_AGENT:-}
+      - BROWSER_TIMEOUT_MS=${BROWSER_TIMEOUT_MS:-20000}
+      - BROWSER_VIEWPORT_WIDTH=${BROWSER_VIEWPORT_WIDTH:-1920}
+      - BROWSER_VIEWPORT_HEIGHT=${BROWSER_VIEWPORT_HEIGHT:-1080}
+
+      - WEATHER_FORECAST_DAYS=${WEATHER_FORECAST_DAYS:-3}
+      - GIT_TIMEOUT=${GIT_TIMEOUT:-120}
+      - PYTHON_TIMEOUT=${PYTHON_TIMEOUT:-30}
+
+      # Internal -- do not change. Must match the volume mount below.
+      - SANDBOX_WORKSPACE=/workspace
+
+      # ============================================================
+      # SKILL TOGGLES -- set any to "false" to hide that skill's tools
+      # from the MCP tool list entirely (the module isn't even imported).
+      # Note: a skill that imports another skill's plain functions directly
+      # still works even if the imported skill is disabled here -- e.g.
+      # itinerary keeps using flights/weather/web_search's functions even if
+      # those three are individually disabled below, since it imports them
+      # directly; same for git/coding reusing sandbox's path-safety helpers.
+      # Disabling only hides a skill's OWN tools, not its code being reused
+      # by others.
+      # ============================================================
+      - SKILL_BROWSER_ENABLED=${SKILL_BROWSER_ENABLED:-true}
+      - SKILL_CARS_ENABLED=${SKILL_CARS_ENABLED:-true}
+      - SKILL_CODING_ENABLED=${SKILL_CODING_ENABLED:-true}
+      - SKILL_DATABASE_ENABLED=${SKILL_DATABASE_ENABLED:-true}
+      - SKILL_FLIGHTS_ENABLED=${SKILL_FLIGHTS_ENABLED:-true}
+      - SKILL_GIT_ENABLED=${SKILL_GIT_ENABLED:-true}
+      - SKILL_HOTELS_ENABLED=${SKILL_HOTELS_ENABLED:-true}
+      - SKILL_ITINERARY_ENABLED=${SKILL_ITINERARY_ENABLED:-true}
+      - SKILL_LOCAL_LLM_ENABLED=${SKILL_LOCAL_LLM_ENABLED:-true}
+      - SKILL_MEMORY_ENABLED=${SKILL_MEMORY_ENABLED:-true}
+      - SKILL_NEWS_ENABLED=${SKILL_NEWS_ENABLED:-true}
+      - SKILL_PACKAGES_ENABLED=${SKILL_PACKAGES_ENABLED:-true}
+      - SKILL_SANDBOX_ENABLED=${SKILL_SANDBOX_ENABLED:-true}
+      - SKILL_UTILS_ENABLED=${SKILL_UTILS_ENABLED:-true}
+      - SKILL_WEATHER_ENABLED=${SKILL_WEATHER_ENABLED:-true}
+      - SKILL_WEB_SEARCH_ENABLED=${SKILL_WEB_SEARCH_ENABLED:-true}
+    volumes:
+      - mcp_workspace:/workspace
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
+
+volumes:
+  mcp_workspace:

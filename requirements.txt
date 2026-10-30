@@ -1,0 +1,33 @@
+# Deliberately unpinned so rebuilds always pick up the latest release of
+# each package. One exception: mcp is capped below 2.0 because that major
+# version renamed FastMCP to MCPServer (confirmed breaking against this
+# codebase) -- removing this cap will break server.py the next time pip
+# resolves mcp>=2.0 as the default.
+mcp>=1.30.0,<2.0.0
+
+httpx
+tzdata
+ruff
+
+# Scrapes Google Flights' internal API via an undocumented, community-run
+# package. Its internal API (FlightQuery/Passengers/create_filter/get_flights)
+# has changed across versions before and could again -- if a rebuild breaks
+# search_flights/plan_trip, this is the first place to check.
+fast-flights
+
+# Scrapes Google Hotels, same undocumented-internal-API pattern as
+# fast-flights (same author ecosystem). Ships with a hardcoded, outdated
+# primp browser-impersonation string ("chrome_126") that newer primp
+# versions reject outright -- skills/hotels.py monkeypatches this at import
+# time (patches fast_hotels.core.Client, not primp itself) since the fix
+# can't live upstream without a new fast-hotels release. If a rebuild breaks
+# search_hotels with an "Invalid impersonate" error, that monkeypatch's
+# target chrome_NNN value is the first thing to check against whatever primp
+# version actually installed.
+fast-hotels
+
+# The pip package version and the downloaded browser binary are matched in
+# the same Dockerfile RUN step (`playwright install` always fetches the
+# browser build that matches whatever version of this package just got
+# installed), so leaving this unpinned is safe -- the two can't drift apart.
+playwright
