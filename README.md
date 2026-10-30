@@ -249,19 +249,23 @@ whichever fits:
 ### Local LLM bridge
 | Tool | What it does |
 |---|---|
-| `ask_local_llm(prompt, system, backend, max_tokens, temperature)` | Calls your own LM Studio and/or MLX server (`lmstudio_server.sh` / `mlx_server.sh`) via their OpenAI-compatible APIs. `backend="auto"` tries LM Studio then MLX. |
+| `ask_local_llm(prompt, system, backend, max_tokens, temperature)` | Calls an LLM via an OpenAI-compatible API: your own self-hosted Open WebUI instance, Google Gemini, or OpenRouter. `backend="auto"` tries Open WebUI first, then Gemini, then OpenRouter. |
 
-**On `LOCAL_LLM_MODEL`: leave it unset.** Your MLX server reports raw HuggingFace
-repo IDs (`mlx-community/Qwen3-30B-A3B-4bit`), LM Studio reports its own catalog
-names (`qwen/qwen3.5-9b`), and Pi's `pi_models.json` aliases both of those to yet
-a third naming scheme (`qwen3-30b-moe`) -- no single hardcoded value is correct
-for both backends. Auto-detect (query the backend's own `/models`, use what it
-reports) is actually more correct than pinning a value, since it always matches
-whatever's actually loaded and adapts when you switch models via
-`mlx_server.sh`'s M1/M2/M3 configs. If LM Studio ever has multiple models loaded
-at once and you need to pin a specific one, use `LMSTUDIO_MODEL`/`MLX_MODEL`
-(per-backend, since the id formats differ) rather than the shared
-`LOCAL_LLM_MODEL`.
+Three independent backends, each only used if configured:
+- **`openwebui`** -- your own self-hosted instance (`OPENWEBUI_URL`, ending in
+  `/api` not `/v1`). Typically free, so it auto-detects the first available
+  model (query its own `/models`) if `OPENWEBUI_MODEL` isn't set -- same
+  behavior as before for any self-hosted backend.
+- **`gemini`** -- Google's API (`GEMINI_API_KEY` from Google AI Studio).
+- **`openrouter`** -- OpenRouter's API (`OPENROUTER_API_KEY`).
+
+**Gemini and OpenRouter both require an explicit `GEMINI_MODEL`/`OPENROUTER_MODEL`.**
+Unlike Open WebUI, these are hosted, multi-model providers with real
+per-token cost -- there's no sensible "first model" to auto-pick, and silently
+picking one from a huge catalog risks an unexpectedly expensive choice. Set
+one yourself from the provider's own model list (e.g. `gemini-2.5-flash`,
+`anthropic/claude-sonnet-4.5`); the tool returns a clear error telling you to
+if it's missing.
 
 ## Configuration
 
@@ -270,7 +274,8 @@ only have to look at what actually matters for your setup:
 
 1. **Copy `env.example` to `.env`** and fill in the handful of settings
    there -- that file lists *only* what's worth reviewing per-deployment
-   (your SearXNG URL, your local LLM endpoints, optionally your git identity).
+   (your SearXNG URL, your Open WebUI/Gemini/OpenRouter credentials,
+   optionally your git identity).
 2. **Everything else already has a sensible default**, organized into two
    more sections directly in `docker-compose.yml` (not duplicated in this
    README -- that file's comments are the source of truth, one comment per
@@ -302,19 +307,10 @@ docker compose up -d --build
 Other machines on your LAN reach it at `http://<host>:8088/sse` (replace
 `<host>` with this machine's LAN IP).
 
-> **If the box running this container is different from the Mac running
-> `lmstudio_server.sh`/`mlx_server.sh`** (likely -- that's probably also your
-> SearXNG box, and MLX only runs on Apple Silicon Macs): the local LLM
-> bridge's defaults (`host.docker.internal`) resolve to whatever machine is
-> *running the container*, not to your Mac. Override them in `.env` to that
-> Mac's actual LAN IP instead, e.g.:
-> ```
-> LMSTUDIO_URL=http://<your-mac's-lan-ip>:1234/v1
-> MLX_URL=http://<your-mac's-lan-ip>:8080/v1
-> ```
-> `SEARXNG_URL` doesn't have this problem -- it's already a full LAN address,
-> not `localhost`/`host.docker.internal`, so it works unchanged regardless of
-> which box runs the container.
+> **The local LLM bridge's `OPENWEBUI_URL` needs to be a real LAN address**,
+> not `localhost` -- that always resolves to whatever machine is *running the
+> container*, not necessarily the one hosting your Open WebUI instance.
+> `SEARXNG_URL` has the same requirement and works the same way.
 
 ## Adding a new skill
 
@@ -332,11 +328,8 @@ other skills' functions directly.
 
 ### Pi coding agent
 
-Official MCP extension: [pi-mcp-extension](https://pi.dev/packages/pi-mcp-extension).
-
-```bash
-pi install npm:pi-mcp-extension
-```
+Pi 1.0+ has built-in MCP support (via Codemode) -- no separate extension to
+install anymore.
 
 Add to `~/.pi/agent/mcp.json` (global) or `.pi/mcp.json` (per-project) -- either
 transport works, same server/tools either way:
@@ -474,6 +467,6 @@ the two can't drift apart from each other even though neither is pinned.
 - **`run_command`** is real, unrestricted shell access *inside the
   container*. The container (no host mounts, non-root user) is the security
   boundary, not anything inside it.
-- **`ask_local_llm`** requires you to actually start `lmstudio_server.sh` or
-  `mlx_server.sh` on the host first -- it fails gracefully with a clear
-  message if neither is reachable.
+- **`ask_local_llm`** requires at least one backend actually configured
+  (`OPENWEBUI_URL`, or an API key for Gemini/OpenRouter) -- it fails
+  gracefully with a clear per-backend message if none are reachable/set.

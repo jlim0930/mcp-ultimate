@@ -4,20 +4,42 @@ import httpx
 
 from skills.config import LOCAL_LLM_TIMEOUT
 
-SHARED_MODEL_OVERRIDE = os.environ.get("LOCAL_LLM_MODEL", "")
+GEMINI_URL = os.environ.get("GEMINI_URL", "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
+
+OPENROUTER_URL = os.environ.get("OPENROUTER_URL", "https://openrouter.ai/api/v1").rstrip("/")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "")
+
+OPENWEBUI_URL = os.environ.get("OPENWEBUI_URL", "").rstrip("/")
+OPENWEBUI_API_KEY = os.environ.get("OPENWEBUI_API_KEY", "")
+OPENWEBUI_MODEL = os.environ.get("OPENWEBUI_MODEL", "")
 
 
 def _config():
     return {
-        "lmstudio": {
-            "url": os.environ.get("LMSTUDIO_URL", "http://host.docker.internal:1234/v1").rstrip("/"),
-            "api_key": os.environ.get("LMSTUDIO_API_KEY", ""),
-            "model_override": os.environ.get("LMSTUDIO_MODEL", "") or SHARED_MODEL_OVERRIDE,
+        # Self-hosted, typically free -- auto-detect a model is a reasonable
+        # default the same way it was for LM Studio/MLX before.
+        "openwebui": {
+            "url": OPENWEBUI_URL,
+            "api_key": OPENWEBUI_API_KEY,
+            "model": OPENWEBUI_MODEL,
+            "requires_key": False,
         },
-        "mlx": {
-            "url": os.environ.get("MLX_URL", "http://host.docker.internal:8080/v1").rstrip("/"),
-            "api_key": os.environ.get("MLX_API_KEY", ""),
-            "model_override": os.environ.get("MLX_MODEL", "") or SHARED_MODEL_OVERRIDE,
+        # Hosted, multi-model, real per-token cost -- no sensible "first
+        # model" default, so these two require an explicit model id.
+        "gemini": {
+            "url": GEMINI_URL,
+            "api_key": GEMINI_API_KEY,
+            "model": GEMINI_MODEL,
+            "requires_key": True,
+        },
+        "openrouter": {
+            "url": OPENROUTER_URL,
+            "api_key": OPENROUTER_API_KEY,
+            "model": OPENROUTER_MODEL,
+            "requires_key": True,
         },
     }
 
@@ -43,10 +65,20 @@ async def _resolve_model(client: httpx.AsyncClient, base_url: str, headers: dict
     return "local-model"
 
 
-async def _call_backend(name, cfg, prompt, system, max_tokens, temperature) -> str:
+async def _call_backend(name: str, cfg: dict, prompt: str, system: str, max_tokens: int, temperature: float) -> str:
+    if not cfg["url"]:
+        raise RuntimeError(f"{name.upper()}_URL is not set")
+    if cfg["requires_key"] and not cfg["api_key"]:
+        raise RuntimeError(f"{name.upper()}_API_KEY is not set")
+
     headers = _headers(cfg["api_key"])
     async with httpx.AsyncClient(timeout=LOCAL_LLM_TIMEOUT) as client:
-        model = await _resolve_model(client, cfg["url"], headers, cfg["model_override"])
+        if cfg["requires_key"] and not cfg["model"]:
+            raise RuntimeError(
+                f"{name.upper()}_MODEL is not set -- {name} hosts many models with real "
+                "per-token cost and no sensible default, pick one from its model list and set it"
+            )
+        model = await _resolve_model(client, cfg["url"], headers, cfg["model"])
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -76,37 +108,36 @@ async def ask_local_llm(
     max_tokens: int = 512,
     temperature: float = 0.7,
 ) -> str:
-    """Ask your own local LLM (LM Studio and/or MLX server) via its OpenAI-compatible API.
+    """Ask an LLM via an OpenAI-compatible API: your own self-hosted Open
+    WebUI instance, Google Gemini, or OpenRouter.
 
-    backend: "auto" (try lmstudio, then mlx), "lmstudio", or "mlx".
+    backend: "auto" (tries openwebui first since it's typically self-hosted
+    and free, then gemini, then openrouter), or name one directly:
+    "openwebui", "gemini", "openrouter".
 
-    Endpoints and optional API keys are configured via env vars (see .env.example),
-    not hardcoded: LMSTUDIO_URL/LMSTUDIO_API_KEY and MLX_URL/MLX_API_KEY. Both
-    default to host.docker.internal, which reaches servers running on the
-    Docker host's Mac (e.g. via lmstudio_server.sh / mlx_server.sh) from inside
-    this container. LMSTUDIO_MODEL/MLX_MODEL pin a model id per backend (they
-    use different id formats -- e.g. MLX's mlx-community/Qwen3-30B-A3B-4bit vs
-    LM Studio's own catalog names); LOCAL_LLM_MODEL is a shared fallback for
-    both if you only ever run one model at a time. Leave all three unset to
-    auto-detect from whichever model the backend's /models endpoint reports.
+    Gemini and OpenRouter need an API key (GEMINI_API_KEY / OPENROUTER_API_KEY)
+    and an explicit model id (GEMINI_MODEL / OPENROUTER_MODEL) -- both host
+    many models with real per-token cost, so there's no sensible auto-picked
+    default; pick one from the provider's own model list and set it. Open
+    WebUI (OPENWEBUI_URL, pointed at your own instance) auto-detects the
+    first available model if OPENWEBUI_MODEL isn't set.
     """
     cfg = _config()
-    order = {"auto": ["lmstudio", "mlx"], "lmstudio": ["lmstudio"], "mlx": ["mlx"]}.get(
-        backend, ["lmstudio", "mlx"]
-    )
+    order = {
+        "auto": ["openwebui", "gemini", "openrouter"],
+        "openwebui": ["openwebui"],
+        "gemini": ["gemini"],
+        "openrouter": ["openrouter"],
+    }.get(backend, ["openwebui", "gemini", "openrouter"])
 
     errors = []
     for name in order:
         try:
             return await _call_backend(name, cfg[name], prompt, system, max_tokens, temperature)
         except Exception as e:
-            errors.append(f"{name} ({cfg[name]['url']}): {e}")
+            errors.append(f"{name}: {e}")
 
-    return (
-        "error: no local LLM backend reachable.\n"
-        + "\n".join(errors)
-        + "\n\nStart one on the host with lmstudio_server.sh or mlx_server.sh."
-    )
+    return "error: no backend reachable/configured.\n" + "\n".join(errors)
 
 
 def register(mcp):

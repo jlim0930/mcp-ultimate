@@ -15,17 +15,19 @@ services:
       # a LAN IP (not "localhost") works regardless of which machine runs this.
       - SEARXNG_URL=${SEARXNG_URL:-http://searxng.local:8080}
 
-      # Local LLM bridge (ask_local_llm) -- LM Studio / MLX servers started via
-      # lmstudio_server.sh / mlx_server.sh. host.docker.internal only works if
-      # those run on the SAME machine as this container. If they run
-      # elsewhere (e.g. your Mac, while this container runs on a separate LAN
-      # box), use that machine's actual LAN IP instead -- see README.
-      - LMSTUDIO_URL=${LMSTUDIO_URL:-http://host.docker.internal:1234/v1}
-      - MLX_URL=${MLX_URL:-http://host.docker.internal:8080/v1}
-      # Only set these if you've configured an API key requirement on that
-      # server (uncommon for local-only use).
-      - LMSTUDIO_API_KEY=${LMSTUDIO_API_KEY:-}
-      - MLX_API_KEY=${MLX_API_KEY:-}
+      # Local LLM bridge (ask_local_llm) -- your own self-hosted Open WebUI
+      # instance. Point this at a real LAN address (not "localhost"), e.g.
+      # http://192.168.1.50:3000/api -- note the path ends in /api, not /v1.
+      # Leave blank to skip this backend entirely.
+      - OPENWEBUI_URL=${OPENWEBUI_URL:-}
+      - OPENWEBUI_API_KEY=${OPENWEBUI_API_KEY:-}
+      # Cloud fallbacks for ask_local_llm -- both need your own API key and
+      # an explicit model id (see ADVANCED section below for the *_MODEL
+      # vars; there's no sensible auto-picked default when a provider hosts
+      # many models with real per-token cost). Leave the API key blank to
+      # skip a backend entirely.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
       # Identity attached to commits made by git_commit. Change to your own
       # name/email if you want commits attributable to you instead of the
@@ -59,13 +61,17 @@ services:
       # crypto/fetch_url.
       - HTTP_TIMEOUT=${HTTP_TIMEOUT:-10}
 
-      # Leave all three blank -- auto-detect is more correct than a fixed
-      # value here, since LM Studio/MLX/Pi's alias layer all use different,
-      # mutually incompatible model-id formats. See README if you need to
-      # pin one anyway (e.g. LM Studio has multiple models loaded at once).
-      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-}
-      - LMSTUDIO_MODEL=${LMSTUDIO_MODEL:-}
-      - MLX_MODEL=${MLX_MODEL:-}
+      # REQUIRED if you use gemini/openrouter at all -- both host many models
+      # with real per-token cost, so there's no sensible default to fall
+      # back to. Pick a model id from the provider's own model list.
+      # Examples (verify current ids against each provider -- these change):
+      # GEMINI_MODEL=gemini-2.5-flash
+      # OPENROUTER_MODEL=anthropic/claude-sonnet-4.5
+      - GEMINI_MODEL=${GEMINI_MODEL:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-}
+      # Only set if your Open WebUI instance has multiple models loaded and
+      # you need to pin one -- leave blank to auto-detect the first available.
+      - OPENWEBUI_MODEL=${OPENWEBUI_MODEL:-}
       - LOCAL_LLM_TIMEOUT=${LOCAL_LLM_TIMEOUT:-60}
 
       # Leave blank to randomize across a pool of real desktop browser UAs
