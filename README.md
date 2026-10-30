@@ -300,7 +300,7 @@ application-level, settings.
 ## Running it
 
 ```bash
-cp .env.example .env   # edit as needed
+cp env.example .env   # edit as needed
 docker compose up -d --build
 ```
 
