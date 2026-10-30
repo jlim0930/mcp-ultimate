@@ -9,7 +9,7 @@ home LAN box and be pointed at by any MCP-speaking agent.
   Same server instance, same tools, either works -- use whichever your client
   supports or prefers (Streamable HTTP is the current MCP spec's recommended
   transport; SSE is kept for clients that still expect it).
-- **Image:** Python 3.12-slim + headless-shell Chromium (Playwright) + git + ruff, ~1.54GB
+- **Image:** Python 3.12-slim + headless-shell Chromium (Playwright) + git + ruff, ~1.57GB
 - **Extending it:** drop a new file in `skills/` with a `register(mcp)`
   function -- `server.py` auto-discovers it on the next container restart, no
   other wiring required. See [Adding a new skill](#adding-a-new-skill).
@@ -21,6 +21,9 @@ server.py            FastMCP app. Walks skills/, imports every module,
                       calls module.register(mcp) if present.
 skills/config.py      Shared env-driven settings (timeouts, limits) that
                       more than one skill file imports.
+skills/search_engines.py  Shared Bing/Kayak scraping logic, imported by
+                      web_search.py/news.py/flights.py/hotels.py. Like
+                      config.py, not itself a skill -- no tools, no toggle.
 skills/*.py           One file per skill. Each defines its tool function(s)
                       at module level (so other skills can import and reuse
                       them -- see itinerary.py) plus a register(mcp) that
@@ -437,23 +440,28 @@ Fixed by switching to the non-deprecated `from selectolax.lexbor import
 LexborHTMLParser` (API is otherwise identical). This is the shape of risk
 you're signing up for with unpinned deps in general -- things work today and
 can break on the next rebuild when an upstream package makes a breaking
-change, with no warning beyond the crash itself. `fast-flights` in particular
-is a small, community-run package with a history of internal API churn
-(`FlightQuery`/`Passengers`/`create_filter`/`get_flights`) -- if a rebuild
-breaks `search_flights`/`plan_trip` specifically, that's the first place to
-check. `playwright` is unpinned but safe: the Dockerfile's `playwright
+change, with no warning beyond the crash itself. `fast-flights` and
+`fast-hotels` in particular are small, community-run packages (same author
+ecosystem) with a history of internal API churn -- if a rebuild breaks
+`search_flights`/`search_hotels`/`plan_trip`, those are the first place to
+check. `fast-hotels` is the more fragile of the two: it already needed a
+`primp`-version compatibility patch once (see "Travel sites" above) and could
+need another after some future release. `playwright` is unpinned but safe: the Dockerfile's `playwright
 install` step always downloads the browser build matching whatever version
 of the `playwright` *package* pip just resolved, in that same build step, so
 the two can't drift apart from each other even though neither is pinned.
 
 ## Known tradeoffs (read before relying on this in production)
 
-- **`search_flights`/`search_hotels`/`search_car_rentals`/`search_packages`**
-  scrape or deep-link against sites whose ToS prohibit automated access. They
-  work today; they are not guaranteed to keep working. See "Travel sites:
-  what's real vs. a link" above for exactly which parts are real scraped
-  data, confirmed deep links, or best-effort/unconfirmed links, per site.
-- **`browse`** ships a full headless Chromium -- most of the image's 1.54GB.
+- **`search_flights`/`search_hotels`/`search_car_rentals`/`search_packages`/
+  `search_flights_kayak`/`search_hotels_kayak`** scrape or deep-link against
+  sites whose ToS prohibit automated access. They work today; they are not
+  guaranteed to keep working. See "Travel sites: what's real vs. a link"
+  above for exactly which parts are real scraped data, confirmed deep links,
+  or best-effort/unconfirmed links, per site -- the two `_kayak` tools are
+  the most likely to break first, since Kayak's CSS classes are
+  algorithmically-generated hashes, not semantic/stable names.
+- **`browse`** ships a full headless Chromium -- most of the image's 1.57GB.
   It also still identifies itself as headless at the protocol level: Chromium
   generates its `Sec-Ch-Ua` Client Hints header from the actual browser
   binary (e.g. `"HeadlessChrome";v="156"`), independent of whatever
