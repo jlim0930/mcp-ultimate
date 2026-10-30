@@ -31,7 +31,7 @@ The container runs as a non-root user with no host filesystem mounts --
 `sandbox`'s shell/file tools are contained to the image and a single named
 Docker volume (`mcp_workspace`), not your host disk.
 
-## Skill catalog (49 tools)
+## Skill catalog (58 tools)
 
 Any skill can be turned off without touching code -- see
 [Enable/disable skills](#enabledisable-skills).
@@ -214,6 +214,28 @@ path traversal.
 |---|---|
 | `remember(key, value)` / `recall(key)` / `list_memories()` / `forget(key)` | Simple JSON-backed key/value notes, persisted in the same `/workspace` volume, survives container restarts. |
 
+### Knowledge graph
+| Tool | What it does |
+|---|---|
+| `kg_create_entities(entities, graph)` | Create named things (people/projects/concepts) with a type and optional facts. Existing entities are left as-is. |
+| `kg_create_relations(relations, graph)` / `kg_delete_relations(relations, graph)` | Typed directed links between entities, e.g. `Justin --works_at--> Elastic`. |
+| `kg_add_observations(entity_name, observations, graph)` / `kg_delete_observations(entity_name, observations, graph)` | Append or remove individual facts on an existing entity. |
+| `kg_delete_entities(entity_names, graph)` | Delete entities and their relations. |
+| `kg_read_graph(graph)` | Dump the entire graph: every entity, its facts, and all relations. |
+| `kg_search_nodes(query, graph)` | Substring search across entity names/types/observations. |
+| `kg_open_nodes(entity_names, graph)` | Fetch specific entities plus the relations between them. |
+
+Mirrors the shape of the official `@modelcontextprotocol/server-memory`
+reference server (entities/observations/relations), backed by SQLite instead
+of a flat JSONL file for consistency with the rest of this project. This is
+deliberately **complementary** to the two simpler memory tools above/below,
+not a replacement -- three different shapes of "remember things," pick
+whichever fits:
+- `remember`/`recall` -- flat key-value, for a single fact under a single name
+- `kb_index`/`kb_search` -- full-text search over fetched page content
+- `kg_*` -- structured facts *about* something, and how things relate to
+  each other (e.g. "who works at which company")
+
 ### Toolbox
 | Tool | What it does |
 |---|---|
@@ -344,7 +366,7 @@ Or, for Streamable HTTP instead:
 
 `lifecycle: "eager"` connects on startup; use `"lazy"` if you'd rather start
 it on demand with `/mcp:start`. Restart Pi (or reload its MCP config) and its
-49 tools should appear alongside your built-in `read`/`write`/`edit`/`bash`.
+58 tools should appear alongside your built-in `read`/`write`/`edit`/`bash`.
 
 ### Hermes Agent
 
@@ -389,7 +411,7 @@ hermes mcp test mcp_ultimate
 ```
 
 Hermes' docs recommend `tools.include: [...]` to whitelist a minimal tool
-set rather than exposing all 49 by default, especially since `run_command`
+set rather than exposing all 58 by default, especially since `run_command`
 has unrestricted shell access inside the container -- worth doing here if
 Hermes will be driving this server autonomously. You can also cut the
 exposed surface at the source with this server's own
