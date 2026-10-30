@@ -13,7 +13,7 @@ services:
 
       # Your SearXNG instance. Must be reachable from inside the container --
       # a LAN IP (not "localhost") works regardless of which machine runs this.
-      - SEARXNG_URL=${SEARXNG_URL:-http://192.168.1.20:8080}
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng.local:8080}
 
       # Local LLM bridge (ask_local_llm) -- LM Studio / MLX servers started via
       # lmstudio_server.sh / mlx_server.sh. host.docker.internal only works if

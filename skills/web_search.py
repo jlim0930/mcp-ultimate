@@ -5,7 +5,7 @@ import httpx
 from skills.config import HTTP_TIMEOUT, SEARCH_PREFER_BROWSER, random_headers
 from skills.search_engines import bing_web_search
 
-SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://192.168.1.20:8080").rstrip("/")
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://searxng.local:8080").rstrip("/")
 
 
 async def _searxng_web_search(query: str, max_results: int) -> list[dict]:

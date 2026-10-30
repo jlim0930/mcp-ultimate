@@ -2,8 +2,7 @@
 
 A single, lightweight Dockerized MCP server exposing a growing set of free,
 mostly keyless "skills" over both SSE and Streamable HTTP. Built to run on a
-home LAN box (this deployment: `192.168.1.20:8088`) and be pointed at by any
-MCP-speaking agent.
+home LAN box and be pointed at by any MCP-speaking agent.
 
 - **Transport:** both served from the same process/port --
   SSE at `http://<host>:8088/sse`, Streamable HTTP at `http://<host>:8088/mcp`.
@@ -260,14 +259,11 @@ cp .env.example .env   # edit as needed
 docker compose up -d --build
 ```
 
-Deployed here at `192.168.1.20`, so other machines on the LAN reach it at:
+Other machines on your LAN reach it at `http://<host>:8088/sse` (replace
+`<host>` with this machine's LAN IP).
 
-```
-http://192.168.1.20:8088/sse
-```
-
-> **If `192.168.1.20` is a different box from the Mac running
-> `lmstudio_server.sh`/`mlx_server.sh`** (likely -- that's already the
+> **If the box running this container is different from the Mac running
+> `lmstudio_server.sh`/`mlx_server.sh`** (likely -- that's probably also your
 > SearXNG box, and MLX only runs on Apple Silicon Macs): the local LLM
 > bridge's defaults (`host.docker.internal`) resolve to whatever machine is
 > *running the container*, not to your Mac. Override them in `.env` to that
@@ -310,7 +306,7 @@ transport works, same server/tools either way:
   "mcpServers": {
     "mcp-ultimate": {
       "transport": "sse",
-      "url": "http://192.168.1.20:8088/sse",
+      "url": "http://<host>:8088/sse",
       "lifecycle": "eager"
     }
   }
@@ -324,7 +320,7 @@ Or, for Streamable HTTP instead:
   "mcpServers": {
     "mcp-ultimate": {
       "transport": "streamable-http",
-      "url": "http://192.168.1.20:8088/mcp",
+      "url": "http://<host>:8088/mcp",
       "lifecycle": "eager"
     }
   }
@@ -344,7 +340,7 @@ Add to `~/.hermes/config.yaml`:
 ```yaml
 mcp_servers:
   mcp_ultimate:
-    url: "http://192.168.1.20:8088/sse"
+    url: "http://<host>:8088/sse"
     transport: "sse"
     enabled: true
     timeout: 120
@@ -359,7 +355,7 @@ into the legacy transport -- to use Streamable HTTP instead, point `url` at
 ```yaml
 mcp_servers:
   mcp_ultimate:
-    url: "http://192.168.1.20:8088/mcp"
+    url: "http://<host>:8088/mcp"
     enabled: true
     timeout: 120
     connect_timeout: 60

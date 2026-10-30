@@ -19,7 +19,7 @@ USER mcp
 
 ENV PYTHONUNBUFFERED=1 \
     MCP_PORT=8088 \
-    SEARXNG_URL=http://192.168.1.20:8080 \
+    SEARXNG_URL=http://searxng.local:8080 \
     SANDBOX_WORKSPACE=/workspace \
     SANDBOX_CMD_TIMEOUT=60 \
     GIT_AUTHOR_NAME=mcp-ultimate \
